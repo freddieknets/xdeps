@@ -284,6 +284,19 @@ def test_table_show():
     assert table.show(output=str) == "name value\na        1\nb        2\nc        3"
 
 
+def test_table_show_private_printer_preserves_output(capsys):
+    data = dict(name=np.array(["a", "b", "c"]), value=np.array([1, 2, 3]))
+    table = Table(data)
+
+    table.show()
+    expected = capsys.readouterr().out
+
+    output = []
+    table.show(_printer=lambda value: output.append(value))
+
+    assert output == [expected.removesuffix("\n")]
+
+
 def test_table_show_rows():
     data = {"name": np.array(["a", "b", "c"]), "value": np.array([1, 2, 3])}
     table = Table(data)

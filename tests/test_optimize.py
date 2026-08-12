@@ -3,6 +3,30 @@ import xobjects as xo
 import xdeps as xd
 
 
+def test_private_optimizer_printer_preserves_status_output(capsys):
+    def my_function(x):
+        return x
+
+    kwargs = dict(
+        function=my_function,
+        x0=[1.],
+        steps=[1e-6],
+        tar=[0.],
+        tols=[1e-12],
+        show_call_counter=False,
+    )
+    default_opt = xd.Optimize.from_callable(**kwargs)
+    default_opt.vary_status()
+    expected = capsys.readouterr().out
+
+    output = []
+    injected_opt = xd.Optimize.from_callable(
+        **kwargs, _printer=lambda value, **kwargs: output.append(value))
+    injected_opt.vary_status()
+
+    assert '\n'.join(output) + '\n' == expected
+
+
 def test_merit_function_view():
 
     def my_function(x):

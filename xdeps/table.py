@@ -689,6 +689,7 @@ class Table:
         digits=6,
         fixed="g",
         header=True,
+        _printer=None,
     ):
         """
         Show the table in a human-readable format.
@@ -799,7 +800,8 @@ class Table:
                 result.append("...")
         result = "\n".join(result)
         if output is None:
-            print(result)
+            printer = print if _printer is None else _printer
+            printer(result)
         elif output is str:
             return result
         elif hasattr(output, "write"):

@@ -200,6 +200,7 @@ class MeritFunctionForMatch:
         steps_for_jacobian,
         check_limits,
         show_call_counter=True,
+        _printer=None,
     ):
 
         self.vary = vary
@@ -214,6 +215,7 @@ class MeritFunctionForMatch:
         self.zero_if_met = False
         self.show_call_counter = show_call_counter
         self.check_limits = check_limits
+        self._print = _print if _printer is None else _printer
 
     def _x_to_knobs(self, x):
         knob_values = np.array(x).copy()
@@ -342,7 +344,7 @@ class MeritFunctionForMatch:
                 self.last_point_within_tol = True
                 self.found_point_within_tol = True
                 if self.verbose:
-                    _print("Found point within tolerance!")
+                    self._print("Found point within tolerance!")
             else:
                 self.last_point_within_tol = False
 
@@ -377,7 +379,7 @@ class MeritFunctionForMatch:
             out = np.array(err_values)
 
         if self.show_call_counter:
-            _print(
+            self._print(
                 f"Matching: model call n. {self.call_counter} "
                 + f"penalty = {np.sqrt(out_scalar):.4e}"
                 + "              ",
@@ -558,6 +560,7 @@ class Optimize:
         show_call_counter=True,
         check_limits=True,
         name="",
+        _printer=None,
         **kwargs,
     ):
         """
@@ -646,6 +649,7 @@ class Optimize:
 
         """
         self.name = name
+        self._print = _print if _printer is None else _printer
 
         if isinstance(vary, (str, Vary)):
             vary = [vary]
@@ -705,7 +709,7 @@ class Optimize:
             solver = "jacobian"
 
         if verbose:
-            _print(f"Using solver {solver}")
+            self._print(f"Using solver {solver}")
 
         steps = []
         for vv in vary:
@@ -729,10 +733,13 @@ class Optimize:
             steps_for_jacobian=steps,
             check_limits=check_limits,
             show_call_counter=False,
+            _printer=self._print,
         )
 
         if solver == "jacobian":
-            self.solver = JacobianSolver(func=_err, verbose=verbose, **solver_options)
+            self.solver = JacobianSolver(
+                func=_err, verbose=verbose, _printer=self._print,
+                **solver_options)
         else:
             raise NotImplementedError(f"Solver {solver} not implemented.")
 
@@ -764,7 +771,7 @@ class Optimize:
     @classmethod
     def from_callable(cls, function, x0, tar, steps=None, tols=None,
                       limits=None,
-                      show_call_counter=True):
+                      show_call_counter=True, _printer=None):
 
         """
         Build an optimizer from a Python callable.
@@ -853,6 +860,7 @@ class Optimize:
             vary=vary,
             targets=targets,
             show_call_counter=show_call_counter,
+            _printer=_printer,
         )
 
         for ii, tt in enumerate(opt.targets):
@@ -1069,7 +1077,7 @@ class Optimize:
                         gtol=gtol,
                         ))
         if disp:
-            print(res.message)
+            self._print(res.message)
         merit_function.set_x(res.x)
         self.tag('l-bfgs-b')
 
@@ -1597,8 +1605,8 @@ class Optimize:
             self.step(n_steps, verbose=verbose, take_best=take_best, rcond=rcond, sing_val_cutoff=sing_val_cutoff, broyden=broyden)
 
             if not self._err.last_point_within_tol:
-                _print("\n")
-                _print("Could not find point within tolerance.")
+                self._print("\n")
+                self._print("Could not find point within tolerance.")
 
             if self.assert_within_tol and not self._err.last_point_within_tol:
                 raise RuntimeError("Could not find point within tolerance.")
@@ -1606,7 +1614,7 @@ class Optimize:
         except Exception as err:
             if self.restore_if_fail:
                 self.reload(iteration=0)
-            _print("\n")
+            self._print("\n")
             raise err
         # if self._err.show_call_counter:
         #     _print("\n")
@@ -1672,7 +1680,7 @@ class Optimize:
                 self.solve()
             except RuntimeError:
                 # Reverting values
-                print("Reverting Values")
+                self._print("Reverting Values")
                 self.reload(tag=f"Homotopy it {i-1}")
                 return
 
@@ -1680,7 +1688,7 @@ class Optimize:
 
     def _add_starting_point_to_log_and_print(self, verbose):
         if verbose is None or verbose > 0:
-            _print("                                             ")
+            self._print("                                             ")
         self.tag()
         pen_start = self._log["penalty"][-1]
         to_print = 'Optimize'
@@ -1688,7 +1696,7 @@ class Optimize:
             to_print += f" [{self.name}]"
         to_print += f" - start penalty: {pen_start:.4g}                         "
         if verbose is None or verbose > 0:
-            _print(to_print)
+            self._print(to_print)
 
     def _print_end(self, verbose):
         pen_end = self._log["penalty"][-1]
@@ -1697,7 +1705,7 @@ class Optimize:
             to_print += f" [{self.name}]"
         to_print += f" - end penalty:  {pen_end:-4g}                            "
         if verbose is None or verbose > 0:
-            _print(to_print)
+            self._print(to_print)
 
     def vary_status(self, ret=False, max_col_width=40, iter_ref=0, maxwidth=1000):
         """
@@ -1794,8 +1802,10 @@ class Optimize:
         if ret:
             return vvv
         else:
-            print("Vary status:                 ")
-            vvv.show(max_col_width=max_col_width, maxwidth=maxwidth)
+            self._print("Vary status:                 ")
+            vvv.show(
+                max_col_width=max_col_width, maxwidth=maxwidth,
+                _printer=self._print)
 
 
     def target_status(self, ret=False, max_col_width=40, maxwidth=1000):
@@ -1867,8 +1877,10 @@ class Optimize:
         if ret:
             return ttt
         else:
-            print("Target status:               ")
-            ttt.show(max_col_width=max_col_width, maxwidth=maxwidth)
+            self._print("Target status:               ")
+            ttt.show(
+                max_col_width=max_col_width, maxwidth=maxwidth,
+                _printer=self._print)
 
     def target_mismatch(self, ret=False, max_col_width=40, maxwidth=1000):
         """
@@ -1913,8 +1925,10 @@ class Optimize:
         if ret:
             return out
         else:
-            print("Target mismatch:             ")
-            out.show(max_col_width=max_col_width, maxwidth=maxwidth)
+            self._print("Target mismatch:             ")
+            out.show(
+                max_col_width=max_col_width, maxwidth=maxwidth,
+                _printer=self._print)
 
     def get_knob_values(self, iteration=None):
         """
@@ -2006,11 +2020,15 @@ class Optimize:
         """
 
         if vary:
-            print("Vary:")
-            self._vary_table().show(maxwidth=maxwidth, max_col_width=max_col_width)
+            self._print("Vary:")
+            self._vary_table().show(
+                maxwidth=maxwidth, max_col_width=max_col_width,
+                _printer=self._print)
         if targets:
-            print("Targets:")
-            self._targets_table().show(maxwidth=maxwidth, max_col_width=max_col_width)
+            self._print("Targets:")
+            self._targets_table().show(
+                maxwidth=maxwidth, max_col_width=max_col_width,
+                _printer=self._print)
 
     def log(self):
         """
